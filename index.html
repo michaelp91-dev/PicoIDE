@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pico File Explorer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Pico Web Explorer</h1>
+        <p>View files on your Raspberry Pi Pico via USB.</p>
+    </header>
+    <main>
+        <div id="controls">
+            <button id="connectButton">Connect to Pico</button>
+        </div>
+        <div id="status">Status: Disconnected</div>
+        <div id="fileListContainer">
+            <h2>Files on Pico:</h2>
+            <pre id="fileList"></pre>
+        </div>
+    </main>
+    <footer>
+        Version 1.0.0
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>
