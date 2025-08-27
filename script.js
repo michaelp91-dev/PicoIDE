@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const PICO_VENDOR_ID = 0x2e8a;
     const PICO_PRODUCT_ID = 0x0005;
 
-    // Check if WebUSB is supported by the browser
     if (!('usb' in navigator)) {
         statusDisplay.textContent = 'Error: WebUSB is not supported by your browser.';
         connectButton.disabled = true;
@@ -24,15 +23,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function connect() {
         try {
-            // Request permission to connect to the Pico
             device = await navigator.usb.requestDevice({
                 filters: [{ vendorId: PICO_VENDOR_ID, productId: PICO_PRODUCT_ID }]
             });
 
             await device.open();
             await device.selectConfiguration(1);
-            // CORRECTED: The MicroPython REPL data interface is #1.
-            await device.claimInterface(1); 
+            
+            // NEW STRATEGY: Claim both the control and data interfaces.
+            // Interface 0 is the control interface for the serial connection.
+            await device.claimInterface(0); 
+            // Interface 1 is the data interface. This is where the error was.
+            await device.claimInterface(1);
 
             statusDisplay.textContent = 'Status: Connected';
             connectButton.textContent = 'Disconnect';
@@ -41,17 +43,20 @@ document.addEventListener('DOMContentLoaded', () => {
             await listFiles();
         } catch (error) {
             statusDisplay.textContent = `Error: ${error.message}`;
+            // If connection fails, reset device variable
+            device = null;
         }
     }
 
     async function disconnect() {
         if (device) {
             try {
-                // Before closing, it's good practice to release the interface.
+                // Release interfaces in reverse order of claiming.
                 await device.releaseInterface(1);
+                await device.releaseInterface(0);
                 await device.close();
             } catch (error) {
-                console.error('Error closing device:', error);
+                console.error('Error during disconnect:', error);
             }
         }
         device = null;
@@ -61,9 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function sendCommand(command) {
-        // Append newline character to execute the command in REPL
         const data = new TextEncoder().encode(command + '\r\n');
-        // CORRECTED: The data OUT endpoint for interface 1 is typically #2.
         await device.transferOut(2, data); 
     }
 
@@ -71,16 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!device) return;
 
         try {
-            // Commands to enter raw mode, list files, and exit raw mode
-            const enterRawMode = '\x01'; // Ctrl+A
+            const enterRawMode = '\x01';
             const listFilesCommand = "import os; print(os.listdir())";
-            const exitRawMode = '\x04'; // Ctrl+D
+            const exitRawMode = '\x04';
 
             await sendCommand(enterRawMode);
             await sendCommand(listFilesCommand);
             await sendCommand(exitRawMode);
 
-            // Give Pico a moment to process and respond
             setTimeout(readResponse, 200);
 
         } catch (error) {
@@ -90,11 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     async function readResponse() {
         try {
-            // CORRECTED: The data IN endpoint for interface 1 is typically #2.
-            let result = await device.transferIn(2, 512); // Read up to 512 bytes
+            let result = await device.transferIn(2, 512);
             let text = new TextDecoder().decode(result.data);
             
-            // Clean up the raw output from the REPL
             const fileArray = text.match(/\['.*'\]/);
             if(fileArray) {
                 fileListDisplay.textContent = JSON.parse(fileArray[0].replace(/'/g, '"')).join('\n');
@@ -103,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (error) {
-            // Ignore timeout errors which can happen if there's no data
             if (error.message.includes("timed out")) {
                  fileListDisplay.textContent = "No response from Pico. Try reconnecting.";
             } else {
