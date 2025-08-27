@@ -31,8 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             await device.open();
             await device.selectConfiguration(1);
-            // The REPL is usually on interface 2
-            await device.claimInterface(2); 
+            // CORRECTED: The MicroPython REPL data interface is #1.
+            await device.claimInterface(1); 
 
             statusDisplay.textContent = 'Status: Connected';
             connectButton.textContent = 'Disconnect';
@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function disconnect() {
         if (device) {
             try {
+                // Before closing, it's good practice to release the interface.
+                await device.releaseInterface(1);
                 await device.close();
             } catch (error) {
                 console.error('Error closing device:', error);
@@ -61,8 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function sendCommand(command) {
         // Append newline character to execute the command in REPL
         const data = new TextEncoder().encode(command + '\r\n');
-        // The endpoint number 4 is typically the OUT endpoint for the REPL
-        await device.transferOut(4, data); 
+        // CORRECTED: The data OUT endpoint for interface 1 is typically #2.
+        await device.transferOut(2, data); 
     }
 
     async function listFiles() {
@@ -72,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Commands to enter raw mode, list files, and exit raw mode
             const enterRawMode = '\x01'; // Ctrl+A
             const listFilesCommand = "import os; print(os.listdir())";
-            const exitRawMode = '\x04'; // Ctrl+D would also work here to soft reboot and show output
+            const exitRawMode = '\x04'; // Ctrl+D
 
             await sendCommand(enterRawMode);
             await sendCommand(listFilesCommand);
@@ -88,8 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     async function readResponse() {
         try {
-            // The endpoint number 4 is also the IN endpoint here
-            let result = await device.transferIn(4, 512); // Read up to 512 bytes
+            // CORRECTED: The data IN endpoint for interface 1 is typically #2.
+            let result = await device.transferIn(2, 512); // Read up to 512 bytes
             let text = new TextDecoder().decode(result.data);
             
             // Clean up the raw output from the REPL
