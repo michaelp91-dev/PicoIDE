@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
             await device.selectConfiguration(1);
             await device.claimInterface(0); 
             await device.claimInterface(1);
-
             statusDisplay.textContent = 'Status: Connected';
             connectButton.textContent = 'Disconnect';
             await listFiles();
@@ -53,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
             await device.releaseInterface(0);
             await device.close();
         } catch (error) { console.error('Error during disconnect:', error); }
-        
         device = null;
         statusDisplay.textContent = 'Status: Disconnected';
         connectButton.textContent = 'Connect to Pico';
@@ -76,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { statusDisplay.textContent = `Error: ${error.message}`; }
     }
 
-    // ##### NEW RELIABLE READING LOGIC #####
     async function readUntilEOT() {
         let buffer = '';
         while (true) {
@@ -87,31 +84,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (buffer.includes(EOT_MARKER)) {
                     const eotIndex = buffer.indexOf(EOT_MARKER);
                     const cleanData = buffer.substring(0, eotIndex);
-                    
                     if (currentAction === 'list') {
                         handleListResponse(cleanData);
                     } else if (currentAction === 'read') {
                         handleFileResponse(cleanData);
                     }
-                    return; // Exit the loop
+                    return;
                 }
             } catch (error) {
-                // A timeout error can be normal if the device is busy.
-                // We'll just log non-timeout errors and break.
                 if (!error.message.includes("timed out")) {
                     statusDisplay.textContent = `Error reading from Pico: ${error.message}`;
-                    return; // Exit on critical error
+                    return;
                 }
             }
         }
     }
 
+    // ##### SECTION CHANGED #####
     async function listFiles() {
         showFileListView();
         currentAction = 'list';
         fileListDisplay.innerHTML = '<em>Fetching file list...</em>';
-        // Command now includes our EOT marker
-        const command = `import os; print(','.join(os.listdir())); print('${EOT_MARKER}')`;
+        // Command now formats the list as a JSON string for reliability.
+        const command = `import os, json; print(json.dumps(os.listdir())); print('${EOT_MARKER}')`;
         await enterRawModeAndExecute(command);
     }
 
@@ -120,11 +115,14 @@ document.addEventListener('DOMContentLoaded', () => {
         currentAction = 'read';
         fileNameHeader.textContent = filename;
         fileContentDisplay.textContent = `Reading '${filename}'...`;
-        // Command now includes a finally block to ensure EOT is always sent
+        // Command now sends the file line-by-line with a small delay to prevent buffer overflow.
         const command = `
+import time
 try:
     with open('${filename}', 'r') as f:
-        print(f.read())
+        for line in f:
+            print(line, end='')
+            time.sleep_ms(2)
 except Exception as e:
     print('###ERROR###:' + str(e))
 finally:
@@ -133,27 +131,30 @@ finally:
         await enterRawModeAndExecute(command);
     }
     
+    // ##### SECTION CHANGED #####
     function handleListResponse(text) {
         fileListDisplay.innerHTML = '';
-        // Clean any REPL prompts before splitting
         const lastPromptIndex = text.lastIndexOf('>');
         const cleanText = lastPromptIndex !== -1 ? text.substring(lastPromptIndex + 1) : text;
         
-        const files = cleanText.trim().split(',');
-
-        if (files.length > 0 && files[0] !== "") {
-            files.forEach(filename => {
-                const link = document.createElement('a');
-                link.href = '#';
-                link.textContent = filename.trim();
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    readFile(filename.trim());
+        try {
+            const files = JSON.parse(cleanText.trim());
+            if (files.length > 0) {
+                files.forEach(filename => {
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.textContent = filename.trim();
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        readFile(filename.trim());
+                    });
+                    fileListDisplay.appendChild(link);
                 });
-                fileListDisplay.appendChild(link);
-            });
-        } else {
-            fileListDisplay.innerHTML = '<em>No files found.</em>';
+            } else {
+                fileListDisplay.innerHTML = '<em>No files found.</em>';
+            }
+        } catch (e) {
+            fileListDisplay.innerHTML = `<em>Error parsing file list. Raw data: ${cleanText}</em>`;
         }
         statusDisplay.textContent = 'Status: Connected';
     }
@@ -176,4 +177,3 @@ finally:
         fileContentContainer.classList.remove('hidden');
     }
 });
-            
