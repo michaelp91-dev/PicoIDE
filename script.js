@@ -12,23 +12,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     let device;
     let currentAction = null; 
-    
+    const EOT_MARKER = '_--EOT--_'; // Our special "finished" signal
+
     // Constants
     const PICO_VENDOR_ID = 0x2e8a;
     const PICO_PRODUCT_ID = 0x0005;
 
-    // Initial Checks
     if (!('usb' in navigator)) {
         statusDisplay.textContent = 'Error: WebUSB is not supported by your browser.';
         connectButton.disabled = true;
         return;
     }
 
-    // Event Listeners
     connectButton.addEventListener('click', () => device ? disconnect() : connect());
     backButton.addEventListener('click', () => listFiles());
 
-    // Core Functions
     async function connect() {
         try {
             device = await navigator.usb.requestDevice({
@@ -73,18 +71,47 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await sendCommand('\x01'); // Enter raw mode
             await sendCommand(command);
-            await sendCommand('\x04'); // Soft reboot
-            setTimeout(readResponse, 300);
+            await sendCommand('\x04'); // Soft reboot to execute
+            await readUntilEOT();      // Wait for the EOT signal
         } catch (error) { statusDisplay.textContent = `Error: ${error.message}`; }
     }
 
-    // Command Functions
+    // ##### NEW RELIABLE READING LOGIC #####
+    async function readUntilEOT() {
+        let buffer = '';
+        while (true) {
+            try {
+                const result = await device.transferIn(2, 4096);
+                const text = new TextDecoder().decode(result.data);
+                buffer += text;
+                if (buffer.includes(EOT_MARKER)) {
+                    const eotIndex = buffer.indexOf(EOT_MARKER);
+                    const cleanData = buffer.substring(0, eotIndex);
+                    
+                    if (currentAction === 'list') {
+                        handleListResponse(cleanData);
+                    } else if (currentAction === 'read') {
+                        handleFileResponse(cleanData);
+                    }
+                    return; // Exit the loop
+                }
+            } catch (error) {
+                // A timeout error can be normal if the device is busy.
+                // We'll just log non-timeout errors and break.
+                if (!error.message.includes("timed out")) {
+                    statusDisplay.textContent = `Error reading from Pico: ${error.message}`;
+                    return; // Exit on critical error
+                }
+            }
+        }
+    }
+
     async function listFiles() {
         showFileListView();
         currentAction = 'list';
         fileListDisplay.innerHTML = '<em>Fetching file list...</em>';
-        // A more robust command that joins filenames with a comma
-        const command = "import os; print(','.join(os.listdir()))";
+        // Command now includes our EOT marker
+        const command = `import os; print(','.join(os.listdir())); print('${EOT_MARKER}')`;
         await enterRawModeAndExecute(command);
     }
 
@@ -93,64 +120,48 @@ document.addEventListener('DOMContentLoaded', () => {
         currentAction = 'read';
         fileNameHeader.textContent = filename;
         fileContentDisplay.textContent = `Reading '${filename}'...`;
-        // Simple text-based read command
+        // Command now includes a finally block to ensure EOT is always sent
         const command = `
 try:
     with open('${filename}', 'r') as f:
         print(f.read())
 except Exception as e:
     print('###ERROR###:' + str(e))
+finally:
+    print('${EOT_MARKER}')
 `;
         await enterRawModeAndExecute(command);
     }
     
-    // Response Handling
-    async function readResponse() {
-        try {
-            let result = await device.transferIn(2, 4096);
-            let text = new TextDecoder().decode(result.data);
-
-            if (currentAction === 'list') {
-                handleListResponse(text);
-            } else if (currentAction === 'read') {
-                handleFileResponse(text);
-            }
-        } catch (error) {
-            if (!error.message.includes("timed out")) {
-                 statusDisplay.textContent = `Error reading response: ${error.message}`;
-            }
-        } finally {
-            currentAction = null; 
-        }
-    }
-
     function handleListResponse(text) {
         fileListDisplay.innerHTML = '';
-        // Split by comma, then clean up any REPL artifacts from the first item
-        const files = text.trim().split(',');
-        const firstFile = files[0];
-        const lastPromptIndex = firstFile.lastIndexOf('>');
-        if (lastPromptIndex !== -1) {
-            files[0] = firstFile.substring(lastPromptIndex + 1);
-        }
+        // Clean any REPL prompts before splitting
+        const lastPromptIndex = text.lastIndexOf('>');
+        const cleanText = lastPromptIndex !== -1 ? text.substring(lastPromptIndex + 1) : text;
+        
+        const files = cleanText.trim().split(',');
 
-        files.forEach(filename => {
-            if (!filename) return;
-            const link = document.createElement('a');
-            link.href = '#';
-            link.textContent = filename.trim();
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                readFile(filename.trim());
+        if (files.length > 0 && files[0] !== "") {
+            files.forEach(filename => {
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = filename.trim();
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    readFile(filename.trim());
+                });
+                fileListDisplay.appendChild(link);
             });
-            fileListDisplay.appendChild(link);
-        });
+        } else {
+            fileListDisplay.innerHTML = '<em>No files found.</em>';
+        }
         statusDisplay.textContent = 'Status: Connected';
     }
 
     function handleFileResponse(text) {
-        // Just display the whole raw output, as requested.
-        fileContentDisplay.textContent = text;
+        const lastPromptIndex = text.lastIndexOf('>');
+        const cleanText = lastPromptIndex !== -1 ? text.substring(lastPromptIndex + 1) : text;
+        fileContentDisplay.textContent = cleanText.trim();
         statusDisplay.textContent = 'Status: Displaying file content.';
     }
 
@@ -165,3 +176,4 @@ except Exception as e:
         fileContentContainer.classList.remove('hidden');
     }
 });
+            
