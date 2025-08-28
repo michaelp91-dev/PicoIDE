@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     let device;
     let currentAction = null; 
-    const EOT_MARKER = '_--EOT--_'; // Our special "finished" signal
+    const EOT_MARKER = '_--EOT--_';
 
     // Constants
     const PICO_VENDOR_ID = 0x2e8a;
@@ -36,6 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
             await device.selectConfiguration(1);
             await device.claimInterface(0); 
             await device.claimInterface(1);
+
+            // ##### THE CRITICAL FIX #####
+            // Set DTR to enable communication, as seen in the Android app code.
+            await setDTR(true);
+            
             statusDisplay.textContent = 'Status: Connected';
             connectButton.textContent = 'Disconnect';
             await listFiles();
@@ -48,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function disconnect() {
         if (!device) return;
         try {
+            await setDTR(false); // Signal that we're done
             await device.releaseInterface(1);
             await device.releaseInterface(0);
             await device.close();
@@ -57,6 +63,18 @@ document.addEventListener('DOMContentLoaded', () => {
         connectButton.textContent = 'Connect to Pico';
         fileListDisplay.innerHTML = '';
         showFileListView();
+    }
+    
+    // ##### NEW FUNCTION TO SET DTR SIGNAL #####
+    async function setDTR(value) {
+        // This command is specific to USB CDC-ACM devices like the Pico.
+        await device.controlTransferOut({
+            requestType: 'class',
+            recipient: 'interface',
+            request: 0x22, // SET_CONTROL_LINE_STATE
+            value: value ? 0x01 : 0x00, // DTR signal on/off
+            index: 0x00 // Interface 0
+        });
     }
 
     async function sendCommand(command) {
@@ -70,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await sendCommand('\x01'); // Enter raw mode
             await sendCommand(command);
             await sendCommand('\x04'); // Soft reboot to execute
-            await readUntilEOT();      // Wait for the EOT signal
+            await readUntilEOT();
         } catch (error) { statusDisplay.textContent = `Error: ${error.message}`; }
     }
 
@@ -100,12 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ##### SECTION CHANGED #####
     async function listFiles() {
         showFileListView();
         currentAction = 'list';
         fileListDisplay.innerHTML = '<em>Fetching file list...</em>';
-        // Command now formats the list as a JSON string for reliability.
         const command = `import os, json; print(json.dumps(os.listdir())); print('${EOT_MARKER}')`;
         await enterRawModeAndExecute(command);
     }
@@ -115,14 +131,10 @@ document.addEventListener('DOMContentLoaded', () => {
         currentAction = 'read';
         fileNameHeader.textContent = filename;
         fileContentDisplay.textContent = `Reading '${filename}'...`;
-        // Command now sends the file line-by-line with a small delay to prevent buffer overflow.
         const command = `
-import time
 try:
     with open('${filename}', 'r') as f:
-        for line in f:
-            print(line, end='')
-            time.sleep_ms(2)
+        print(f.read())
 except Exception as e:
     print('###ERROR###:' + str(e))
 finally:
@@ -131,7 +143,6 @@ finally:
         await enterRawModeAndExecute(command);
     }
     
-    // ##### SECTION CHANGED #####
     function handleListResponse(text) {
         fileListDisplay.innerHTML = '';
         const lastPromptIndex = text.lastIndexOf('>');
@@ -139,7 +150,7 @@ finally:
         
         try {
             const files = JSON.parse(cleanText.trim());
-            if (files.length > 0) {
+            if (files.length > 0 && files[0] !== "") {
                 files.forEach(filename => {
                     const link = document.createElement('a');
                     link.href = '#';
