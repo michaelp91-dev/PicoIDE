@@ -14,9 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentAction = null; 
     const EOT_MARKER = '_--EOT--_';
 
-    // Constants
+    // ##### SECTION CHANGED #####
+    // USB Identifiers for supported boards
     const PICO_VENDOR_ID = 0x2e8a;
-    const PICO_PRODUCT_ID = 0x0005;
+    const ADAFRUIT_VENDOR_ID = 0x239a;
 
     if (!('usb' in navigator)) {
         statusDisplay.textContent = 'Error: WebUSB is not supported by your browser.';
@@ -29,16 +30,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function connect() {
         try {
+            // Updated to filter for either Pico or Adafruit boards
             device = await navigator.usb.requestDevice({
-                filters: [{ vendorId: PICO_VENDOR_ID, productId: PICO_PRODUCT_ID }]
+                filters: [
+                    { vendorId: PICO_VENDOR_ID },
+                    { vendorId: ADAFRUIT_VENDOR_ID }
+                ]
             });
+
             await device.open();
             await device.selectConfiguration(1);
             await device.claimInterface(0); 
             await device.claimInterface(1);
 
-            // ##### THE CRITICAL FIX #####
-            // Set DTR to enable communication, as seen in the Android app code.
+            // Set DTR to enable communication
             await setDTR(true);
             
             statusDisplay.textContent = 'Status: Connected';
@@ -49,11 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
             device = null;
         }
     }
+    // ###########################
 
     async function disconnect() {
         if (!device) return;
         try {
-            await setDTR(false); // Signal that we're done
+            await setDTR(false);
             await device.releaseInterface(1);
             await device.releaseInterface(0);
             await device.close();
@@ -65,9 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showFileListView();
     }
     
-    // ##### NEW FUNCTION TO SET DTR SIGNAL #####
     async function setDTR(value) {
-        // This command is specific to USB CDC-ACM devices like the Pico.
         await device.controlTransferOut({
             requestType: 'class',
             recipient: 'interface',
@@ -177,7 +181,6 @@ finally:
         statusDisplay.textContent = 'Status: Displaying file content.';
     }
 
-    // UI View Management
     function showFileListView() {
         fileContentContainer.classList.add('hidden');
         fileListContainer.classList.remove('hidden');
