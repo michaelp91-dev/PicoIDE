@@ -23,7 +23,7 @@ header h1 {
     color: #333;
 }
 
-#controls button {
+#controls button, #backButton {
     font-size: 1rem;
     padding: 12px 20px;
     border-radius: 6px;
@@ -34,7 +34,7 @@ header h1 {
     transition: background-color 0.2s;
 }
 
-#controls button:hover, #controls button:active {
+#controls button:hover, #controls button:active, #backButton:hover, #backButton:active {
     background-color: #0056b3;
 }
 
@@ -44,7 +44,7 @@ header h1 {
     color: #606770;
 }
 
-#fileListContainer {
+#fileListContainer, #fileContentContainer {
     margin-top: 1.5rem;
     text-align: left;
 }
@@ -56,7 +56,6 @@ header h1 {
     padding: 0.5rem;
 }
 
-/* NEW STYLES for clickable file links */
 #fileList a {
     display: block;
     padding: 10px;
@@ -68,6 +67,26 @@ header h1 {
 
 #fileList a:hover, #fileList a:active {
     background-color: #d8dfea;
+}
+
+/* NEW STYLES */
+#fileContent {
+    background-color: #1c1e21;
+    color: #f0f2f5;
+    padding: 1rem;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#backButton {
+    margin-bottom: 1rem;
+}
+
+.hidden {
+    display: none;
 }
 
 footer {
