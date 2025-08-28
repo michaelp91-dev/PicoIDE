@@ -1,4 +1,4 @@
-    document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     const connectButton = document.getElementById('connectButton');
     const statusDisplay = document.getElementById('status');
     const fileListDisplay = document.getElementById('fileList');
@@ -59,18 +59,20 @@
         await device.transferOut(2, data); 
     }
 
+    // ##### SECTION CHANGED #####
     async function listFiles() {
         currentAction = 'list';
         fileListDisplay.innerHTML = '<em>Fetching file list...</em>';
-        const command = "import os; print(os.listdir())";
+        // This new command asks the Pico to print one file per line.
+        const command = "import os\nfor f in os.listdir(): print(f)";
         await enterRawModeAndExecute(command);
     }
+    // ###########################
 
     async function readFile(filename) {
         currentAction = 'read';
         fileToRead = filename;
         statusDisplay.textContent = `Status: Reading '${filename}'...`;
-        // Read file as binary and print its base64 representation for safe transfer
         const command = `
 import ubinascii
 try:
@@ -89,7 +91,7 @@ except Exception as e:
             await sendCommand('\x01'); // Ctrl+A: Enter raw mode
             await sendCommand(command);
             await sendCommand('\x04'); // Ctrl+D: Soft reboot to execute and get output
-            setTimeout(readResponse, 300); // Increased timeout for file reads
+            setTimeout(readResponse, 300);
         } catch (error) {
             statusDisplay.textContent = `Error: ${error.message}`;
         }
@@ -97,7 +99,7 @@ except Exception as e:
     
     async function readResponse() {
         try {
-            let result = await device.transferIn(2, 4096); // Increased buffer size for files
+            let result = await device.transferIn(2, 4096);
             let text = new TextDecoder().decode(result.data);
 
             if (currentAction === 'list') {
@@ -110,30 +112,36 @@ except Exception as e:
                  statusDisplay.textContent = `Error reading response: ${error.message}`;
             }
         } finally {
-            currentAction = null; // Reset action after handling
+            currentAction = null; 
         }
     }
 
+    // ##### SECTION CHANGED #####
     function handleListResponse(text) {
         fileListDisplay.innerHTML = ''; // Clear loading message
-        const fileArrayMatch = text.match(/\['.*?'\]/);
-        if (fileArrayMatch) {
-            const fileList = JSON.parse(fileArrayMatch[0].replace(/'/g, '"'));
-            fileList.forEach(filename => {
+        
+        // New parsing logic: split the text into lines and filter out junk.
+        const cleanedFiles = text.trim().split(/\r?\n/).filter(f => 
+            f.length > 0 && !f.startsWith('>') && !f.startsWith('OK')
+        );
+
+        if (cleanedFiles.length > 0) {
+            cleanedFiles.forEach(filename => {
                 const link = document.createElement('a');
                 link.href = '#';
-                link.textContent = filename;
+                link.textContent = filename.trim();
                 link.addEventListener('click', (e) => {
                     e.preventDefault();
-                    readFile(filename);
+                    readFile(filename.trim());
                 });
                 fileListDisplay.appendChild(link);
             });
         } else {
-            fileListDisplay.textContent = "Could not parse file list.";
+            fileListDisplay.textContent = "No files found on device.";
         }
         statusDisplay.textContent = 'Status: Connected';
     }
+    // ###########################
 
     function handleFileResponse(text) {
         if (text.includes('ERR:')) {
@@ -143,7 +151,6 @@ except Exception as e:
         const b64Match = text.match(/B64_START:(.*):B64_END/);
         if (b64Match) {
             const b64Data = b64Match[1];
-            // Decode base64 and trigger download
             const binaryString = atob(b64Data);
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
