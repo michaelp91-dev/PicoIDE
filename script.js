@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const VERSION = "1.1.0";
+    document.getElementById('version-footer').textContent = `Version ${VERSION}`;
+
     // UI Elements
     const connectButton = document.getElementById('connectButton');
     const statusDisplay = document.getElementById('status');
@@ -14,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentAction = null; 
     const EOT_MARKER = '_--EOT--_';
 
-    // ##### SECTION CHANGED #####
     // USB Identifiers for supported boards
     const PICO_VENDOR_ID = 0x2e8a;
     const ADAFRUIT_VENDOR_ID = 0x239a;
@@ -30,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function connect() {
         try {
-            // Updated to filter for either Pico or Adafruit boards
             device = await navigator.usb.requestDevice({
                 filters: [
                     { vendorId: PICO_VENDOR_ID },
@@ -42,8 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
             await device.selectConfiguration(1);
             await device.claimInterface(0); 
             await device.claimInterface(1);
-
-            // Set DTR to enable communication
             await setDTR(true);
             
             statusDisplay.textContent = 'Status: Connected';
@@ -54,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
             device = null;
         }
     }
-    // ###########################
 
     async function disconnect() {
         if (!device) return;
@@ -89,9 +87,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function enterRawModeAndExecute(command) {
         if (!device) return;
         try {
-            await sendCommand('\x01'); // Enter raw mode
+            await sendCommand('\x01');
             await sendCommand(command);
-            await sendCommand('\x04'); // Soft reboot to execute
+            await sendCommand('\x04');
             await readUntilEOT();
         } catch (error) { statusDisplay.textContent = `Error: ${error.message}`; }
     }
