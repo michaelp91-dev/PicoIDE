@@ -2,6 +2,9 @@
 
 A simple, client-side web application for viewing files on a Raspberry Pi Pico or other RP2040-based MicroPython board directly from an Android mobile device. This project runs entirely in the browser using the WebUSB API and is hosted on GitHub Pages.
 
+## ⚠️ Current Status: Work in Progress ⚠️
+> **Please Note:** This project is under active development and will likely not work yet. The code in this repository is experimental and for development purposes.
+
 
 
 ## Features
