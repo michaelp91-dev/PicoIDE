@@ -2,27 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1.0">
-    <title>Pico File Explorer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pico/ItsyBitsy File Recovery</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
-        <h1>Pico Web Explorer</h1>
-        <p>View files on your Raspberry Pi Pico via USB.</p>
+        <h1>Device File Recovery</h1>
+        <p>A tool to recover files when Thonny cannot connect.</p>
     </header>
     <main>
         <div id="controls">
-            <button id="connectButton">Connect to Pico</button>
+            <button id="connectButton">1. Connect to Board</button>
         </div>
         <div id="status">Status: Disconnected</div>
-        <div id="fileListContainer">
-            <h2>Files on Pico:</h2>
-            <div id="fileList"></div>
+
+        <div id="recoveryContainer" class="hidden">
+            <label for="filenameInput">2. Type filename to recover:</label>
+            <input type="text" id="filenameInput" placeholder="main.py">
+            <button id="recoverButton">3. Recover File</button>
         </div>
+
         <div id="fileContentContainer" class="hidden">
-            <button id="backButton">&larr; Back to Files</button>
-            <h2 id="fileNameHeader"></h2>
+            <h3>Recovered Content for <span id="fileNameHeader"></span>:</h3>
+            <p>Copy this text and save it somewhere safe!</p>
             <pre id="fileContent"></pre>
         </div>
     </main>
