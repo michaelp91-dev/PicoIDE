@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const VERSION = "1.1.0";
+    // Version is now managed in this file
+    const VERSION = "1.1.1";
     document.getElementById('version-footer').textContent = `Version ${VERSION}`;
 
     // UI Elements
@@ -120,11 +121,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ##### SECTION CHANGED #####
     async function listFiles() {
         showFileListView();
         currentAction = 'list';
         fileListDisplay.innerHTML = '<em>Fetching file list...</em>';
-        const command = `import os, json; print(json.dumps(os.listdir())); print('${EOT_MARKER}')`;
+        // Command is now wrapped in try...finally to guarantee EOT is sent
+        const command = `
+try:
+    import os, json
+    print(json.dumps(os.listdir()))
+except Exception as e:
+    print(f'###ERROR###:{e}')
+finally:
+    print('${EOT_MARKER}')
+`;
         await enterRawModeAndExecute(command);
     }
 
@@ -133,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentAction = 'read';
         fileNameHeader.textContent = filename;
         fileContentDisplay.textContent = `Reading '${filename}'...`;
+        // Command is now wrapped in try...finally
         const command = `
 try:
     with open('${filename}', 'r') as f:
@@ -145,13 +157,23 @@ finally:
         await enterRawModeAndExecute(command);
     }
     
+    // ##### SECTION CHANGED #####
     function handleListResponse(text) {
         fileListDisplay.innerHTML = '';
         const lastPromptIndex = text.lastIndexOf('>');
-        const cleanText = lastPromptIndex !== -1 ? text.substring(lastPromptIndex + 1) : text;
+        let cleanText = lastPromptIndex !== -1 ? text.substring(lastPromptIndex + 1) : text;
+        cleanText = cleanText.trim();
+        
+        // Check if the Pico sent back an error message
+        if (cleanText.startsWith('###ERROR###')) {
+            const errorMessage = cleanText.split(':')[1];
+            fileListDisplay.innerHTML = `<em>Error on Pico: ${errorMessage}<br>The 'json' module may be missing.</em>`;
+            statusDisplay.textContent = 'Status: Error';
+            return;
+        }
         
         try {
-            const files = JSON.parse(cleanText.trim());
+            const files = JSON.parse(cleanText);
             if (files.length > 0 && files[0] !== "") {
                 files.forEach(filename => {
                     const link = document.createElement('a');
