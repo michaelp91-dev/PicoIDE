@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Version is now managed in this file
-    const VERSION = "1.1.1";
+    const VERSION = "1.1.2";
     document.getElementById('version-footer').textContent = `Version ${VERSION}`;
 
     // UI Elements
@@ -18,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentAction = null; 
     const EOT_MARKER = '_--EOT--_';
 
-    // USB Identifiers for supported boards
+    // USB Identifiers
     const PICO_VENDOR_ID = 0x2e8a;
     const ADAFRUIT_VENDOR_ID = 0x239a;
 
@@ -39,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     { vendorId: ADAFRUIT_VENDOR_ID }
                 ]
             });
-
             await device.open();
             await device.selectConfiguration(1);
             await device.claimInterface(0); 
@@ -74,9 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
         await device.controlTransferOut({
             requestType: 'class',
             recipient: 'interface',
-            request: 0x22, // SET_CONTROL_LINE_STATE
-            value: value ? 0x01 : 0x00, // DTR signal on/off
-            index: 0x00 // Interface 0
+            request: 0x22,
+            value: value ? 0x01 : 0x00,
+            index: 0x00
         });
     }
 
@@ -121,12 +119,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ##### SECTION CHANGED #####
     async function listFiles() {
         showFileListView();
         currentAction = 'list';
         fileListDisplay.innerHTML = '<em>Fetching file list...</em>';
-        // Command is now wrapped in try...finally to guarantee EOT is sent
         const command = `
 try:
     import os, json
@@ -144,7 +140,6 @@ finally:
         currentAction = 'read';
         fileNameHeader.textContent = filename;
         fileContentDisplay.textContent = `Reading '${filename}'...`;
-        // Command is now wrapped in try...finally
         const command = `
 try:
     with open('${filename}', 'r') as f:
@@ -160,21 +155,26 @@ finally:
     // ##### SECTION CHANGED #####
     function handleListResponse(text) {
         fileListDisplay.innerHTML = '';
-        const lastPromptIndex = text.lastIndexOf('>');
-        let cleanText = lastPromptIndex !== -1 ? text.substring(lastPromptIndex + 1) : text;
-        cleanText = cleanText.trim();
         
-        // Check if the Pico sent back an error message
+        // More robust cleaning: find the first '[' which marks the start of our JSON array.
+        const jsonStartIndex = text.indexOf('[');
+        if (jsonStartIndex === -1) {
+            fileListDisplay.innerHTML = `<em>Error: No file array found in response. Raw data: ${text}</em>`;
+            return;
+        }
+        
+        let cleanText = text.substring(jsonStartIndex).trim();
+
         if (cleanText.startsWith('###ERROR###')) {
             const errorMessage = cleanText.split(':')[1];
-            fileListDisplay.innerHTML = `<em>Error on Pico: ${errorMessage}<br>The 'json' module may be missing.</em>`;
+            fileListDisplay.innerHTML = `<em>Error on Pico: ${errorMessage}</em>`;
             statusDisplay.textContent = 'Status: Error';
             return;
         }
         
         try {
             const files = JSON.parse(cleanText);
-            if (files.length > 0 && files[0] !== "") {
+            if (files.length > 0) {
                 files.forEach(filename => {
                     const link = document.createElement('a');
                     link.href = '#';
