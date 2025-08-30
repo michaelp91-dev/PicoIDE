@@ -9,7 +9,6 @@ body {
     align-items: center;
     text-align: center;
 }
-
 main {
     width: 100%;
     max-width: 600px;
@@ -18,12 +17,10 @@ main {
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-
 header h1 {
     color: #333;
 }
-
-#controls button, #backButton {
+#controls button, #recoverButton {
     font-size: 1rem;
     padding: 12px 20px;
     border-radius: 6px;
@@ -31,45 +28,29 @@ header h1 {
     background-color: #007bff;
     color: white;
     cursor: pointer;
-    transition: background-color 0.2s;
+    width: 100%;
+    margin-bottom: 10px;
 }
-
-#controls button:hover, #controls button:active, #backButton:hover, #backButton:active {
+#controls button:hover, #controls button:active, #recoverButton:hover, #recoverButton:active {
     background-color: #0056b3;
 }
-
 #status {
     margin-top: 1rem;
     font-style: italic;
     color: #606770;
 }
-
-#fileListContainer, #fileContentContainer {
+#recoveryContainer, #fileContentContainer {
     margin-top: 1.5rem;
     text-align: left;
 }
-
-#fileList {
-    background-color: #e9ebee;
-    border-radius: 6px;
-    min-height: 100px;
-    padding: 0.5rem;
-}
-
-#fileList a {
-    display: block;
+#filenameInput {
+    width: calc(100% - 22px);
+    font-size: 1rem;
     padding: 10px;
-    color: #0056b3;
-    text-decoration: none;
-    border-radius: 4px;
-    transition: background-color 0.2s;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
 }
-
-#fileList a:hover, #fileList a:active {
-    background-color: #d8dfea;
-}
-
-/* NEW STYLES */
 #fileContent {
     background-color: #1c1e21;
     color: #f0f2f5;
@@ -77,18 +58,13 @@ header h1 {
     border-radius: 6px;
     white-space: pre-wrap;
     word-wrap: break-word;
-    max-height: 400px;
+    min-height: 200px;
+    max-height: 50vh;
     overflow-y: auto;
 }
-
-#backButton {
-    margin-bottom: 1rem;
-}
-
 .hidden {
     display: none;
 }
-
 footer {
     margin-top: 2rem;
     font-size: 0.8rem;
